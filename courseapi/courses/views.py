@@ -1,3 +1,63 @@
-from django.shortcuts import render
+from django.contrib.admindocs.utils import parse_rst
+from rest_framework import viewsets, generics, status, parsers
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
-# Create your views here.
+from courses import serializers, paginators
+
+from courses.models import Category, Course, Lesson, Teacher, Student
+from courses.paginators import ItemPagination
+
+
+class CategoryView(viewsets.ViewSet, generics.ListAPIView):
+    queryset = Category.objects.all()
+    serializer_class = serializers.CategorySerializer
+
+class CourseView(viewsets.ViewSet, generics.ListAPIView):
+    queryset = Course.objects.filter(active=True)
+    serializer_class = serializers.CourseSerializer
+    pagination_class = ItemPagination
+
+    def get_queryset(self):
+        query = self.queryset
+
+        q = self.request.query_params.get('q')
+        if q:
+            query = query.filter(name__icontains=q)
+        cate_id = self.request.query_params.get('category_id')
+        if cate_id:
+            query = query.filter(category_id=cate_id)
+
+        sort_by = self.request.query_params.get('sort')
+        if sort_by == 'price_asc':
+            query = query.order_by('fee', 'id')
+        elif sort_by == 'price_desc':
+            query = query.order_by('-fee', 'id')
+        elif sort_by == 'name':
+            query = query.order_by('name', 'id')
+        else:
+            query = query.order_by('id')
+
+        return query
+
+    @action(methods=['get'], url_path='lessons', detail=True)
+    def get_lessons(self, request, pk):
+            lessons = self.get_object().lessons.filter(active=True)
+
+            return Response(serializers.LessonSerializer(lessons, many=True).data, status=status.HTTP_200_OK)
+
+
+class LessonView(viewsets.ViewSet, generics.RetrieveAPIView):
+    queryset = Lesson.objects.prefetch_related('tags').filter(active=True)
+    serializer_class = serializers.LessonDetailSerializer
+
+
+class TeacherView(viewsets.ViewSet, generics.CreateAPIView):
+    queryset = Teacher.objects.filter(is_active=True)
+    serializer_class = serializers.TeacherSerializer
+    parser_classes = [parsers.MultiPartParser]
+
+class StudentView(viewsets.ViewSet, generics.CreateAPIView):
+    queryset = Student.objects.filter(is_active=True)
+    serializer_class = serializers.StudentSerializer
+    parser_classes = [parsers.MultiPartParser]

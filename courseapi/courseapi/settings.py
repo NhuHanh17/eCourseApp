@@ -12,8 +12,12 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 
+from django.conf.global_settings import AUTH_USER_MODEL
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+MEDIA_ROOT = '%s/courses/static/' % BASE_DIR
 
 
 # Quick-start development settings - unsuitable for production
@@ -37,7 +41,24 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'courses.apps.CoursesConfig',
+    'ckeditor',
+    'ckeditor_uploader',
+    'rest_framework',
+    'drf_yasg',
 ]
+
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+cloudinary.config(
+  	cloud_name = "dinusoo6h",
+  	api_key = "113676918263236",
+  	api_secret = "4XJvP2A8bOzrRetOrVard941L_Q"
+)
+
+
+CKEDITOR_UPLOAD_PATH = 'images/ckeditors'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -74,28 +95,37 @@ WSGI_APPLICATION = 'courseapi.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'coursesdb',
+        'USER': 'root',
+        'PASSWORD': '111111',
+        'HOST': '',
     }
 }
+
+import pymysql
+pymysql.install_as_MySQLdb()
+pymysql.version_info = (2, 2, 1, "final", 0)
+
+AUTH_USER_MODEL = 'courses.User'
 
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+    # },
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+    # },
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+    # },
+    # {
+    #     'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+    # },
 ]
 
 
