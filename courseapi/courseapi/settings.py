@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'ckeditor_uploader',
     'rest_framework',
     'drf_yasg',
+    'oauth2_provider',
 ]
 
 import cloudinary
@@ -59,6 +60,11 @@ cloudinary.config(
 
 
 CKEDITOR_UPLOAD_PATH = 'images/ckeditors'
+
+REST_FRAMEWORK = {
+                'DEFAULT_AUTHENTICATION_CLASSES': (
+                        'oauth2_provider.contrib.rest_framework.OAuth2Authentication',)
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -96,7 +102,7 @@ WSGI_APPLICATION = 'courseapi.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'test',
+        'NAME': 'final',
         'USER': 'root',
         'PASSWORD': '111111',
         'HOST': '',

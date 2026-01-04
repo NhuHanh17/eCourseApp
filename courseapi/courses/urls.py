@@ -10,6 +10,7 @@ r.register('courses', views.CourseView, basename='course')
 r.register('lessons', views.LessonView, basename='lesson')
 r.register('teachers', views.TeacherView, basename='teacher')
 r.register('students', views.StudentView, basename='student')
+r.register('users', views.UserView, basename='user')
 
 urlpatterns = [
     path('', include(r.urls)),

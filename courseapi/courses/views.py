@@ -5,7 +5,7 @@ from rest_framework.response import Response
 
 from courses import serializers, paginators
 
-from courses.models import Category, Course, Lesson, Teacher, Student
+from courses.models import Category, Course, Lesson, Teacher, Student, User
 from courses.paginators import ItemPagination
 
 
@@ -43,10 +43,27 @@ class LessonView(viewsets.ViewSet, generics.RetrieveAPIView):
     serializer_class = serializers.LessonDetailSerializer
 
 
+class UserView(viewsets.ViewSet, generics.CreateAPIView):
+    queryset = User.objects.filter(is_active=True)
+    serializer_class = serializers.UserSerializer
+    parser_classes = [parsers.MultiPartParser]
+
+    @action(methods=['get'], url_path='current-user', detail=False )
+    def get_current_user(self, request):
+        return Response(serializers.UserSerializer(request.user).data, status=status.HTTP_200_OK)
+
+
+
+
 class TeacherView(viewsets.ViewSet, generics.CreateAPIView):
     queryset = Teacher.objects.filter(is_active=True)
     serializer_class = serializers.TeacherSerializer
     parser_classes = [parsers.MultiPartParser]
+
+
+    @action(methods=['get'], url_path='current-teacher', detail=False )
+    def get_current_teacher(self, request):
+        return Response(serializers.TeacherSerializer(request.user).data, status=status.HTTP_200_OK)
 
 class StudentView(viewsets.ViewSet, generics.CreateAPIView):
     queryset = Student.objects.filter(is_active=True)
