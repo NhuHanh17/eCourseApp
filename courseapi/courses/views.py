@@ -3,6 +3,7 @@
 
 
 from django.contrib.admindocs.utils import parse_rst
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets, generics, status, parsers, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -31,14 +32,11 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView):
    def get_queryset(self):
        query = self.queryset
        q = self.request.query_params.get('q')
-       print(q)
        if q:
            query = query.filter(name__icontains=q)
        cate_id = self.request.query_params.get('category_id')
        if cate_id:
            query = query.filter(category_id=cate_id)
-       print("final: ")
-       print (query)
        return query
 
 
@@ -62,10 +60,22 @@ class LessonView(viewsets.ViewSet, generics.RetrieveAPIView):
 class UserView(viewsets.ViewSet, generics.CreateAPIView):
    queryset = User.objects.filter(is_active=True)
    serializer_class = serializers.UserSerializer
-   parser_classes = [parsers.MultiPartParser]
+   parser_classes = [parsers.MultiPartParser, parsers.JSONParser]
 
+   @swagger_auto_schema(
+       method='patch',
+       request_body=serializers.UserSerializer,
+       responses={200: serializers.UserSerializer}
+   )
 
-   @action(methods=['get'], url_path='current-user', detail=False, permission_classes=[permissions.IsAuthenticated])
+   @action(methods=['get','patch' ], url_path='current-user', detail=False, permission_classes=[permissions.IsAuthenticated])
    def get_current_user(self, request):
-       return Response(serializers.UserSerializer(request.user).data, status=status.HTTP_200_OK)
+       u = request.user
+       if request.method == 'PATCH':
+           serializer = serializers.UserSerializer(u, data=request.data, partial=True)
+           serializer.is_valid(raise_exception=True)
+           serializer.save()
+           return Response(serializer.data, status=status.HTTP_200_OK)
+
+       return Response(serializers.UserSerializer(u).data, status=status.HTTP_200_OK)
 

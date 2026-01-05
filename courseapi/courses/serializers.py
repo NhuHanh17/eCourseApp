@@ -121,7 +121,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
        if role == User.Role.TEACHER:
-           teacher = Teacher.objects.create_user(
+            teacher = Teacher.objects.create_user(
                username=validated_data["username"],
                password=validated_data["password"],
                email=validated_data.get("email"),
@@ -129,9 +129,31 @@ class UserSerializer(serializers.ModelSerializer):
                last_name=validated_data.get("last_name"),
                bio=teacher_data.get("bio"),
                work_place=teacher_data.get("work_place"),
-               is_verified=False,
-           )
-           return teacher
+               is_verified=False)
+            return teacher
+
+
+   def update(self, instance, validated_data):
+        for attr in ['first_name', 'last_name', 'email', 'avatar']:
+            if attr in validated_data:
+                setattr(instance, attr, validated_data[attr])
+        instance.save()
+
+        teacher_data = validated_data.get('teacher')
+        if teacher_data and hasattr(instance, 'teacher'):
+            serializer = TeacherSerializer(instance.teacher, data=teacher_data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+        student_data = validated_data.get('student')
+        if student_data and hasattr(instance, 'student'):
+            serializer = StudentSerializer(instance.student, data=student_data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+
+        return instance
+
+
 
    def to_representation(self, instance):
        data = super().to_representation(instance)
