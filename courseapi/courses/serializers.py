@@ -1,6 +1,7 @@
 from courses.models import Course, Category, Lesson, Tag, Teacher, Student, User
 from courses.models import Enrollment, Comment
 from rest_framework import serializers
+import json
 
 
 class ImageSerializer(serializers.ModelSerializer):
@@ -132,6 +133,12 @@ class UserSerializer(serializers.ModelSerializer):
                is_verified=False)
             return teacher
 
+   def to_internal_value(self, data):
+       data = data.dict()
+       for field in ['teacher', 'student']:
+           if field in data and isinstance(data[field], str):
+            data[field] = json.loads(data[field])
+       return super().to_internal_value(data)
 
    def update(self, instance, validated_data):
         for attr in ['first_name', 'last_name', 'email', 'avatar']:
@@ -139,17 +146,19 @@ class UserSerializer(serializers.ModelSerializer):
                 setattr(instance, attr, validated_data[attr])
         instance.save()
 
-        teacher_data = validated_data.get('teacher')
-        if teacher_data and hasattr(instance, 'teacher'):
-            serializer = TeacherSerializer(instance.teacher, data=teacher_data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
+        if instance.role == User.Role.TEACHER:
+            teacher_data = validated_data.get('teacher')
+            if teacher_data and hasattr(instance, 'teacher'):
+                serializer = TeacherSerializer(instance.teacher, data=teacher_data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
 
-        student_data = validated_data.get('student')
-        if student_data and hasattr(instance, 'student'):
-            serializer = StudentSerializer(instance.student, data=student_data, partial=True)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
+        if instance.role == User.Role.STUDENT:
+            student_data = validated_data.get('student')
+            if student_data and hasattr(instance, 'student'):
+                serializer = StudentSerializer(instance.student, data=student_data, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
 
         return instance
 
@@ -168,14 +177,11 @@ class UserSerializer(serializers.ModelSerializer):
 
        return data
 
-
 class CommentSerializer(serializers.ModelSerializer):
    user = UserSerializer()
    class Meta:
        model = Comment
        fields = ['id', 'content', 'created_date', 'user']
-
-
 
 
 class EnrollmentSerializer(serializers.ModelSerializer):
