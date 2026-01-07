@@ -47,7 +47,11 @@ INSTALLED_APPS = [
     'rest_framework',
     'drf_yasg',
     'oauth2_provider',
+    'cloudinary',
+    'cloudinary_storage',
 ]
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
 
 import cloudinary
 import cloudinary.uploader
@@ -57,6 +61,8 @@ cloudinary.config(
   	api_key = "113676918263236",
   	api_secret = "4XJvP2A8bOzrRetOrVard941L_Q"
 )
+result = cloudinary.uploader.upload("https://th.bing.com/th/id/R.a06540c84c354244a96450742a701b6f?rik=2NvE4t1PyzY%2fDg&riu=http%3a%2f%2fthuthuatphanmem.vn%2fuploads%2f2018%2f09%2f11%2fhinh-anh-dep-62_044135376.jpg&ehk=ybfSrFxYckpHrcejxmpSY9vzNC07Np4EBKUILpup0iU%3d&risl=1&pid=ImgRaw&r=0")
+print(result)
 
 
 CKEDITOR_UPLOAD_PATH = 'images/ckeditors'

@@ -23,7 +23,7 @@ class CourseAdmin(admin.ModelAdmin):
 
     def image_view(self, course):
         if course.image:
-            return mark_safe(f'<img src="/static/{course.image.name}" width="200" />')
+            return mark_safe(f'<img src="{course.image.url}" width="200" />')
 
 
 @admin.register(Teacher)

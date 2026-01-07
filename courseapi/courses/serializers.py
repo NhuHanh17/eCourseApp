@@ -25,13 +25,30 @@ class CourseSerializer(ImageSerializer):
     tags = TagSerializer(many=True, read_only=True)
     class Meta:
         model = Course
-        fields = 'id', 'name', 'category', 'created_date', 'image', 'tags'
+        fields = 'id', 'name', 'category', 'description' ,'created_date', 'image', 'tags'
+
+
+
 
 class CourseCreateSerializer(CourseSerializer):
-    tags = serializers.PrimaryKeyRelatedField(many=True,queryset=Tag.objects.all(), required=False)
+    tags = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.all(), required=False)
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
+    instructor = serializers.PrimaryKeyRelatedField(read_only=True)
 
-    class Meta(CourseSerializer.Meta):
-        pass
+    class Meta:
+        fields = CourseSerializer.Meta.fields + ('instructor',)
+        extra_kwargs = {
+            'image': {'required': False},
+        }
+
+    def get_image(self, instance):
+        if instance.image:
+            # Nếu là Cloudinary hoặc ImageField, trả về url.
+            # Nếu đã là string (do default), trả về chính nó.
+            if hasattr(instance.image, 'url'):
+                return instance.image.url
+            return str(instance.image)
+        return None
 
 
 

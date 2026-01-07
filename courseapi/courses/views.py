@@ -4,12 +4,18 @@ from rest_framework import viewsets, generics, status, parsers, permissions
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 
 from courses import serializers, paginators, perms
 from courses.models import Category, Course, Lesson, User, Comment, Like, Enrollment, Teacher
 from courses.paginators import ItemPagination
 
 
+@extend_schema(
+    request={
+        'multipart/form-data': serializers.UserSerializer
+    }
+)
 
 
 class CategoryView(viewsets.ViewSet, generics.ListAPIView):
@@ -17,10 +23,11 @@ class CategoryView(viewsets.ViewSet, generics.ListAPIView):
    serializer_class = serializers.CategorySerializer
 
 
-class CourseView(viewsets.ViewSet, generics.ListAPIView):
+class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView):
    queryset = Course.objects.filter(active=True)
    serializer_class = serializers.CourseSerializer
    pagination_class = ItemPagination
+   parsers_classes = [parsers.MultiPartParser, parsers.FormParser,parsers.JSONParser]
 
    def get_queryset(self):
        query = self.queryset
@@ -34,8 +41,14 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView):
        tag_id = self.request.query_params.get('tag_id')
        if tag_id:
            query = query.filter(tags__id=tag_id)
-
        return query.distinct()
+
+   def perform_create(self, serializer):
+       if hasattr(self.request.user, 'teacher'):
+           serializer.save(instructor=self.request.user.teacher)
+       else:
+           from rest_framework.exceptions import ValidationError
+           raise ValidationError({"detail": "Tài khoản không có hồ sơ Giảng viên."})
 
    @action(methods=['get'], url_path='lessons', detail=True)
    def get_lessons(self, request, pk):
@@ -107,7 +120,7 @@ class LessonView(viewsets.ViewSet, generics.RetrieveAPIView):
 class UserView(viewsets.ViewSet, generics.CreateAPIView):
    queryset = User.objects.filter(is_active=True)
    serializer_class = serializers.UserSerializer
-   parser_classes = [parsers.MultiPartParser, parsers.JSONParser]
+   parser_classes = (parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser)
 
    @swagger_auto_schema(
        method='patch',
@@ -118,7 +131,6 @@ class UserView(viewsets.ViewSet, generics.CreateAPIView):
    @action(methods=['get','patch' ], url_path='current-user', detail=False, permission_classes=[permissions.IsAuthenticated])
    def get_current_user(self, request):
        u = request.user
-       print(request.data)
        if request.method == 'PATCH':
            serializer = serializers.UserSerializer(u, data=request.data, partial=True)
            serializer.is_valid(raise_exception=True)

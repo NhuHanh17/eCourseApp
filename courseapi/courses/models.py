@@ -1,6 +1,6 @@
 import datetime
 
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from ckeditor.fields import RichTextField
@@ -17,7 +17,7 @@ class User(AbstractUser):
         TEACHER = "TEACHER", "Giảng viên"
         STUDENT = "STUDENT", "Sinh viên"
     avatar = CloudinaryField(default='https://res.cloudinary.com/dinusoo6h/image/upload/v1767440746/default-avatar-icon-of-social-media-user-vector_jumkxu.jpg')
-
+    # avatar = models.ImageField(default='https://res.cloudinary.com/dinusoo6h/image/upload/v1767440746/default-avatar-icon-of-social-media-user-vector_jumkxu.jpg', upload_to='avatar/%Y/%m/')
     role = models.CharField(
         max_length=10,
         choices=Role.choices,
@@ -106,7 +106,8 @@ class Course(BaseModel):
     description = RichTextField()
     video_url = models.URLField(null=True,blank=True,
                             help_text="Trailer cho khoá học (link youtube hoặc video)")
-    image = CloudinaryField(null=True, blank=True)
+    image = CloudinaryField(null=True, blank=True, default="https://res.cloudinary.com/dinusoo6h/image/upload/v1767792152/Gemini_Generated_Image_enqxopenqxopenqx_s7tmxb.png")
+    # mage = models.ImageField(upload_to="courses/%Y/%m", null=True, blank=True, default='https://res.cloudinary.com/dinusoo6h/image/upload/v1767792152/Gemini_Generated_Image_enqxopenqxopenqx_s7tmxb.png')
     fee = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     duration = models.IntegerField(default = 0, help_text="Tổng số bài học của khóa học",
                                    validators=[MinValueValidator(0)])
@@ -117,7 +118,6 @@ class Course(BaseModel):
 
     def __str__(self):
         return self.name
-
 
 class Lesson(BaseModel):
     subject = models.CharField(max_length=255)
@@ -131,10 +131,6 @@ class Lesson(BaseModel):
 
     class Meta:
         unique_together = ('subject', 'course')
-
-    @property
-    def like_count(self):
-        return self.like_set.filter(active=True).count()
 
 
 # ==========================================================
