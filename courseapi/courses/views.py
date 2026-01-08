@@ -27,7 +27,8 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView)
    queryset = Course.objects.filter(active=True)
    serializer_class = serializers.CourseSerializer
    pagination_class = ItemPagination
-   parsers_classes = [parsers.MultiPartParser, parsers.FormParser,parsers.JSONParser]
+   parsers_classes = [parsers.MultiPartParser, parsers.FormParser]
+
 
    def get_queryset(self):
        query = self.queryset

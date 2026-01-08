@@ -1,13 +1,21 @@
+from django.conf import settings
+
 from courses.models import Course, Category, Lesson, Tag, Teacher, Student, User, Like
 from courses.models import Enrollment, Comment, Transaction
 from rest_framework import serializers
+from django.conf import settings
+
 import json
 
 
 class ImageSerializer(serializers.ModelSerializer):
    def to_representation(self, instance):
        ret = super().to_representation(instance)
-       ret['image'] = instance.image.url
+       if instance.image:
+           image_url = instance.image.url
+           ret['image'] = f"{settings.PUBLIC_IMAGE}{image_url}"
+       else:
+           ret['image'] = None
        return ret
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -29,7 +37,6 @@ class CourseSerializer(ImageSerializer):
 
 
 
-
 class CourseCreateSerializer(CourseSerializer):
     tags = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.all(), required=False)
     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
@@ -40,6 +47,7 @@ class CourseCreateSerializer(CourseSerializer):
         extra_kwargs = {
             'image': {'required': False},
         }
+        depth = 1
 
     def get_image(self, instance):
         if instance.image:
@@ -56,6 +64,7 @@ class LessonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lesson
         fields = 'id', 'subject', 'created_date'
+        depth = 1
 
 
 class LessonDetailSerializer(LessonSerializer):
@@ -232,6 +241,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
    class Meta:
        model = Enrollment
        fields = ['id', 'course', 'student', 'created_date', 'progress', 'is_completed']
+       depth = 1
 
 
 class TransactionSerializer(serializers.ModelSerializer):

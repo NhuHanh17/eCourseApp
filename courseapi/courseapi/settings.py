@@ -13,9 +13,11 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 from pathlib import Path
 
 from django.conf.global_settings import AUTH_USER_MODEL
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 
 MEDIA_ROOT = '%s/courses/static/' % BASE_DIR
 
@@ -29,7 +31,7 @@ SECRET_KEY = 'django-insecure-o=y&&8ycu(4w=@%(2mbfeh519whzo%%z8)=t&=n0)s+p6(k4_u
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['nhuhanh17.pythonanywhere.com',  '127.0.0.1' ]
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -61,8 +63,6 @@ cloudinary.config(
   	api_key = "113676918263236",
   	api_secret = "4XJvP2A8bOzrRetOrVard941L_Q"
 )
-result = cloudinary.uploader.upload("https://th.bing.com/th/id/R.a06540c84c354244a96450742a701b6f?rik=2NvE4t1PyzY%2fDg&riu=http%3a%2f%2fthuthuatphanmem.vn%2fuploads%2f2018%2f09%2f11%2fhinh-anh-dep-62_044135376.jpg&ehk=ybfSrFxYckpHrcejxmpSY9vzNC07Np4EBKUILpup0iU%3d&risl=1&pid=ImgRaw&r=0")
-print(result)
 
 
 CKEDITOR_UPLOAD_PATH = 'images/ckeditors'
@@ -180,3 +180,5 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+PUBLIC_IMAGE = 'https://nhuhanh17.pythonanywhere.com/image_static'

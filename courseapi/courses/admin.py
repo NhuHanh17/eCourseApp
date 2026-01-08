@@ -4,7 +4,7 @@ from django import forms
 from django.contrib.auth.admin import UserAdmin
 from django.urls import path
 from django.utils.safestring import mark_safe
-from courses.models import Course, Category, Teacher, Lesson, Student, Tag, Comment, Like
+from courses.models import Course, Category, Teacher, Lesson, Student, Tag, Comment, Like, Enrollment
 
 
 class LessonForm(forms.ModelForm):
@@ -38,14 +38,12 @@ class TeacherAdmin(UserAdmin):
         ('Thông tin Giảng viên', {'fields': ('bio', 'work_place')}),
     )
 
-    # Cấu hình các trường khi nhấn "Add" (Tạo mới)
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('Thông tin Giảng viên', {
             'classes': ('wide',),
-            'fields': ('bio', 'work_place', 'role'),  # Đảm bảo có role Han vừa thêm
+            'fields': ('bio', 'work_place', 'role'),
         }),
     )
-
 
 @admin.register(Student)
 class StudentAdmin(UserAdmin):
@@ -61,6 +59,7 @@ class StudentAdmin(UserAdmin):
 
 class LessonAdmin(admin.ModelAdmin):
     form = LessonForm
+
 
 
 class MyAdminSite(admin.AdminSite):
@@ -82,4 +81,4 @@ admin_site.register(Student, StudentAdmin)
 admin_site.register(Lesson, LessonAdmin)
 admin_site.register(Tag)
 admin_site.register(Comment)
-admin_site.register(Like)
+admin_site.register(Enrollment)
