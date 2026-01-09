@@ -1,7 +1,8 @@
 from django.conf import settings
+from django.db.models import Avg
 
 from courses.models import Course, Category, Lesson, Tag, Teacher, Student, User, Like
-from courses.models import Enrollment, Comment, Transaction
+from courses.models import Enrollment, Comment, Rating, Transaction
 from rest_framework import serializers
 from django.conf import settings
 
@@ -13,7 +14,10 @@ class ImageSerializer(serializers.ModelSerializer):
        ret = super().to_representation(instance)
        if instance.image:
            image_url = instance.image.url
-           ret['image'] = f"{settings.PUBLIC_IMAGE}{image_url}"
+           if image_url.startswith('http://') or image_url.startswith('https://'):
+               ret['image'] = image_url
+           else:
+               ret['image'] = f"{settings.PUBLIC_IMAGE}{image_url}"
        else:
            ret['image'] = None
        return ret
@@ -31,9 +35,19 @@ class TagSerializer(serializers.ModelSerializer):
 
 class CourseSerializer(ImageSerializer):
     tags = TagSerializer(many=True, read_only=True)
+    total_likes = serializers.SerializerMethodField()
+    avg_rating = serializers.SerializerMethodField()
+
     class Meta:
         model = Course
-        fields = 'id', 'name', 'category', 'description' ,'created_date', 'image', 'tags'
+        fields = 'id', 'name', 'category', 'description' ,'created_date', 'image', 'tags', 'total_likes', 'avg_rating'
+
+    def get_total_likes(self, obj):
+        return obj.like_set.filter(active=True).count()
+
+    def get_avg_rating(self, obj):
+        avg = obj.rating_set.aggregate(Avg('rate'))['rate__avg']
+        return round(avg, 1) if avg else 0
 
 
 
@@ -47,17 +61,6 @@ class CourseCreateSerializer(CourseSerializer):
         extra_kwargs = {
             'image': {'required': False},
         }
-        depth = 1
-
-    def get_image(self, instance):
-        if instance.image:
-            # Nếu là Cloudinary hoặc ImageField, trả về url.
-            # Nếu đã là string (do default), trả về chính nó.
-            if hasattr(instance.image, 'url'):
-                return instance.image.url
-            return str(instance.image)
-        return None
-
 
 
 class LessonSerializer(serializers.ModelSerializer):
@@ -75,7 +78,6 @@ class LessonDetailSerializer(LessonSerializer):
 
 
 class TeacherSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Teacher
         fields = (
@@ -88,7 +90,6 @@ class TeacherSerializer(serializers.ModelSerializer):
         }
 
 class StudentSerializer(serializers.ModelSerializer):
-
     class Meta:
         model = Student
         fields = (
@@ -101,7 +102,6 @@ class StudentSerializer(serializers.ModelSerializer):
 
 
 class UserSerializer(serializers.ModelSerializer):
-
     teacher = TeacherSerializer(required=False)
     student = StudentSerializer(required=False)
 
@@ -126,7 +126,6 @@ class UserSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         role = validated_data.get("role")
-
 
         teacher_data = validated_data.pop("teacher", {})
         student_data = validated_data.pop("student", {})
@@ -194,7 +193,6 @@ class UserSerializer(serializers.ModelSerializer):
             data['avatar'] = avatar.url
         else:
             data['avatar'] = ''
-
         if instance.role == User.Role.TEACHER and 'teacher' in data and data['teacher']:
             teacher_info = data.pop('teacher')
             data.update(teacher_info)
@@ -205,8 +203,6 @@ class UserSerializer(serializers.ModelSerializer):
 
         data.pop('teacher', None)
         data.pop('student', None)
-
-
         return data
 
 
@@ -216,7 +212,10 @@ class UserDataSerializer(serializers.ModelSerializer):
         data['user'] = UserSerializer(instance.user).data
         return data
 
+
 class CommentSerializer(UserDataSerializer):
+    lesson = LessonSerializer(read_only=True)
+    user = UserSerializer(required=False)
     class Meta:
         model = Comment
         fields = ['id', 'content', 'created_date', 'user', 'lesson']
@@ -238,14 +237,22 @@ class LikeSerializer(UserDataSerializer):
         }
 
 class EnrollmentSerializer(serializers.ModelSerializer):
-   class Meta:
-       model = Enrollment
-       fields = ['id', 'course', 'student', 'created_date', 'progress', 'is_completed']
-       depth = 1
+    course = CourseSerializer(read_only=True)
+    class Meta:
+           model = Enrollment
+           fields = ['id', 'course','student','created_date', 'progress', 'is_completed']
+
+class RatingSerializer(serializers.ModelSerializer):
+    course = CourseSerializer(read_only=True)
+    class Meta:
+        model = Rating
+        fields = ['id','rate', 'created_date', 'course']
 
 
 class TransactionSerializer(serializers.ModelSerializer):
+    student_name = serializers.ReadOnlyField(source='enrollment.student.user.get_full_name')
+    pay_method_display = serializers.CharField(source='get_pay_method_display', read_only=True)
+
     class Meta:
         model = Transaction
-        fields = '__all__'
-
+        fields = ['id', 'amount', 'pay_method', 'pay_method_display', 'status', 'student_name', 'created_date']

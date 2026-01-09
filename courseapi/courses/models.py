@@ -136,30 +136,51 @@ class Lesson(BaseModel):
 # ==========================================================
 # 3. TƯƠNG TÁC KẾ THỪA
 # ==========================================================
+class LessonInteraction(BaseModel):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, null=False, blank=False)
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, null=False, blank=False)
 
-class Interaction(BaseModel):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=False, blank=False)
+    class Meta:
+        abstract = True
+
+class CourseInteraction(BaseModel):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE, null=False, blank=False)
     course = models.ForeignKey(Course, on_delete=models.CASCADE, null=False, blank=False)
 
     class Meta:
         abstract = True
 
 
-class Comment(Interaction):
+class Comment(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, null=False, blank=False)
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, null=False, blank=False)
+
     content = models.TextField()
 
     def __str__(self):
         return self.content
 
-class Like(Interaction):
     class Meta:
-        unique_together = ('user', 'course')
+        ordering = ['-created_date']
 
 
-class Rating(Interaction):
-    rate = models.IntegerField(default=5)
+class Like(CourseInteraction):
+    class Meta:
+        unique_together = ('student', 'course')
+
+
+class LessonStatus(LessonInteraction):
+    is_completed = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('student', 'lesson')
+
+
+class Rating(CourseInteraction):
+    rate = models.SmallIntegerField(default=5,validators=[MinValueValidator(1),MaxValueValidator(5)])
+
+    class Meta:
+        unique_together = ('student', 'course')
 
 
 # ==========================================================
@@ -177,7 +198,11 @@ class Enrollment(BaseModel):
 
 
 class Transaction(BaseModel):
+    class PayMethods(models.TextChoices):
+        CASH = 'CASH', 'Tiền mặt'
+        MOMO = 'MOMO', 'Ví MoMo'
+        ZALOPAY = 'ZALOPAY', 'ZaloPay'
     enrollment = models.OneToOneField(Enrollment, on_delete=models.CASCADE, related_name='payment')
     amount = models.DecimalField(max_digits=12, decimal_places=2)
-    pay_method = models.CharField(max_length=50)
+    pay_method = models.CharField(max_length=50,choices=PayMethods.choices,default=PayMethods.CASH)
     status = models.BooleanField(default=False)

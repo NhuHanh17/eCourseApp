@@ -16,7 +16,7 @@ class LessonForm(forms.ModelForm):
 
 
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'duration', 'fee', 'instructor' )
+    list_display = ('id','name', 'category', 'duration', 'fee', 'instructor' )
     list_filter = ('category', 'instructor','fee')
     search_fields = ('name',)
     readonly_fields = ('image_view',)
@@ -47,15 +47,22 @@ class TeacherAdmin(UserAdmin):
 
 @admin.register(Student)
 class StudentAdmin(UserAdmin):
-    list_display = ('username', 'email', 'student_code')
+    list_display = ('username', 'email', 'student_code', 'avatar')
     fieldsets = UserAdmin.fieldsets + (
         ('Thông tin Sinh viên', {'fields': ('student_code', 'birth_date')}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('Thông tin Sinh viên', {
-            'fields': ('student_code', 'birth_date', 'role'),
+            'fields': ('student_code', 'birth_date', 'role', 'avatar'),
         }),
     )
+    readonly_fields = ('avatar_view',)
+    def avatar_view(self, student):
+        if student.avatar:
+            return mark_safe(f'<img src="{student.avatar.url}" width="100" style="border-radius: 50%;" />')
+        return "Chưa có ảnh"
+
+    avatar_view.short_description = 'Ảnh đại diện'
 
 class LessonAdmin(admin.ModelAdmin):
     form = LessonForm

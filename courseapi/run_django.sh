@@ -15,6 +15,20 @@ export PYTHONIOENCODING=utf-8
 
 python manage.py createsuperuser --no-input || echo "SuperUser đã tồn tại!"
 
+python manage.py shell <<EOF
+from django.contrib.auth import get_user_model
+User = get_user_model()
+u = User.objects.filter(username='admin').first()
+if u:
+    u.role = 'ADMIN' # Gán lại role là ADMIN
+    u.is_staff = True
+    u.is_superuser = True
+    u.save()
+    print("=== Đã cập nhật quyền ADMIN cho user: admin ===")
+EOF
+
+
+
 echo "=== 4. Đang chèn dữ liệu mẫu tổng hợp cho Han ==="
 python manage.py shell <<EOF
 

@@ -111,7 +111,7 @@ WSGI_APPLICATION = 'courseapi.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'final',
+        'NAME': 'demo',
         'USER': 'root',
         'PASSWORD': '111111',
         'HOST': '',
@@ -143,6 +143,11 @@ pymysql.install_as_MySQLdb()
 pymysql.version_info = (2, 2, 1, "final", 0)
 
 AUTH_USER_MODEL = 'courses.User'
+
+
+OAUTH2_PROVIDER = {
+    'ACCESS_TOKEN_EXPIRE_SECONDS': 31536000,
+}
 
 
 # Password validation
