@@ -65,7 +65,7 @@ cloudinary.config(
 )
 
 
-CKEDITOR_UPLOAD_PATH = 'images/ckeditors'
+CKEDITOR_UPLOAD_PATH = '/static/images/ckeditors'
 
 REST_FRAMEWORK = {
                 'DEFAULT_AUTHENTICATION_CLASSES': (

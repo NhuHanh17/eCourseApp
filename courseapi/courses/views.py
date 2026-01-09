@@ -67,7 +67,7 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
        course = self.get_object()
        student = request.user.student
 
-       method = request.data.get('pay_method', Transaction.PayMethods.CASH)leson
+       method = request.data.get('pay_method', Transaction.PayMethods.CASH)
        course_fee = getattr(course, 'fee', 0)
 
        try:
@@ -168,17 +168,6 @@ class LessonView(viewsets.ViewSet, generics.RetrieveAPIView):
 
         return Response(serializers.CommentSerializer(comments, many=True).data, status=status.HTTP_200_OK)
 
-    @action(methods=['get'], url_path='likes', detail=True)
-    def get_like(self, request, pk):
-        if request.method.__eq__('POST'):
-            s = serializers.LikeSerializer(data={
-                'user': self.request.user.pk,
-            })
-            s.is_valid(raise_exception=True)
-            like = s.save()
-            return Response(serializers.LikeSerializer(like).data, status=status.HTTP_200_OK)
-        return Response(serializers.LikeSerializer(request).data, status=status.HTTP_200_OK)
-
     @action(methods=['post'], url_path='complete', detail=True)
     def mark_completed(self, request, pk):
         lesson = self.get_object()
@@ -196,7 +185,7 @@ class LessonView(viewsets.ViewSet, generics.RetrieveAPIView):
         )
 
         return Response({
-            "message": "Đã ghi nhận hoàn thành bài học!",
+            "message": "Bạn đã hoàn thành bài học!",
             "lesson": lesson.subject,
             "is_completed": ls.is_completed,
             "updated_date": ls.updated_date
