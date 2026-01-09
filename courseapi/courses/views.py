@@ -8,7 +8,7 @@ from drf_spectacular.utils import extend_schema
 from django.db import transaction
 
 from courses import serializers, paginators, perms
-from courses.models import Category, Course, Lesson, User, Comment, Like, Enrollment, Teacher, Rating, Transaction
+from courses.models import Category, Course, Lesson, User, Comment, Like, Enrollment, Teacher, Rating, Transaction, LessonStatus
 from courses.paginators import ItemPagination
 
 
@@ -67,8 +67,7 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
        course = self.get_object()
        student = request.user.student
 
-       method = request.data.get('pay_method', Transaction.PayMethods.CASH)
-
+       method = request.data.get('pay_method', Transaction.PayMethods.CASH)leson
        course_fee = getattr(course, 'fee', 0)
 
        try:
@@ -180,6 +179,28 @@ class LessonView(viewsets.ViewSet, generics.RetrieveAPIView):
             return Response(serializers.LikeSerializer(like).data, status=status.HTTP_200_OK)
         return Response(serializers.LikeSerializer(request).data, status=status.HTTP_200_OK)
 
+    @action(methods=['post'], url_path='complete', detail=True)
+    def mark_completed(self, request, pk):
+        lesson = self.get_object()
+        student = request.user.student
+
+        is_enrolled = Enrollment.objects.filter(student=student, course=lesson.course).exists()
+        if not is_enrolled:
+            return Response({"detail": "Bạn chưa đăng ký khóa học này"},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        ls, created = LessonStatus.objects.update_or_create(
+            student=student,
+            lesson=lesson,
+            defaults={'is_completed': True}
+        )
+
+        return Response({
+            "message": "Đã ghi nhận hoàn thành bài học!",
+            "lesson": lesson.subject,
+            "is_completed": ls.is_completed,
+            "updated_date": ls.updated_date
+        }, status=status.HTTP_200_OK)
 
 
 class UserView(viewsets.ViewSet, generics.CreateAPIView):
