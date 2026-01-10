@@ -12,13 +12,6 @@ from courses.models import Category, Course, Lesson, User, Comment, Like, Enroll
 from courses.paginators import ItemPagination
 
 
-@extend_schema(
-    request={
-        'multipart/form-data': serializers.UserSerializer
-    }
-)
-
-
 class CategoryView(viewsets.ViewSet, generics.ListAPIView):
    queryset = Category.objects.all()
    serializer_class = serializers.CategorySerializer
@@ -30,6 +23,13 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
    pagination_class = ItemPagination
    parsers_classes = [parsers.MultiPartParser, parsers.FormParser]
    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
+
+   def get_permissions(self):
+       if self.action == 'create':
+           return [perms.IsVerifiedTeacher()]
+       elif self.action in ['update', 'partial_update', 'destroy']:
+           return [perms.IsVerifiedTeacher(), perms.IsInstructorOfCourse()]
+       return [permissions.AllowAny()]
 
 
    def get_queryset(self):
@@ -46,21 +46,31 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
            query = query.filter(tags__id=tag_id)
        return query.distinct()
 
+
    def perform_create(self, serializer):
-       if hasattr(self.request.user, 'teacher'):
-           serializer.save(instructor=self.request.user.teacher)
-       else:
-           from rest_framework.exceptions import ValidationError
-           raise ValidationError({"detail": "Tài khoản không có hồ sơ Giảng viên."})
+       serializer.save(instructor=self.request.user.teacher)
 
    def perform_update(self, serializer):
        serializer.save(instructor=self.request.user.teacher)
 
-
-   @action(methods=['get'], url_path='lessons', detail=True)
+   @action(methods=['get', 'post'], url_path='lessons', detail=True)
    def get_lessons(self, request, pk):
-           lessons = self.get_object().lessons.filter(active=True)
-           return Response(serializers.LessonSerializer(lessons, many=True).data, status=status.HTTP_200_OK)
+        course = self.get_object()
+
+        if request.method.__eq__('POST'):
+            teacher_profile = getattr(request.user, 'teacher', None)
+
+            if teacher_profile is None or course.instructor != teacher_profile:
+                return Response({"detail": "Bạn không có quyền thêm bài học vào khóa học này"},status=status.HTTP_403_FORBIDDEN)
+
+            serializer = serializers.LessonCreateSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save(course=course)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        lessons = course.lessons.filter(active=True)
+        return Response(serializers.LessonSerializer(lessons, many=True).data, status=status.HTTP_200_OK)
 
    @action(methods=['post'], url_path='enroll', detail=True)
    def enroll(self, request, pk):
@@ -75,7 +85,6 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
                enrol = Enrollment.objects.create(student=student, course=course)
 
                if course_fee > 0:
-                   method = request.data.get('pay_method', Transaction.PayMethods.CASH)
                    if method not in Transaction.PayMethods.values:
                        return Response({"detail": "Phương thức thanh toán không hợp lệ."},
                                        status=status.HTTP_400_BAD_REQUEST)
@@ -95,7 +104,7 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
 
                return Response({
                    "message": "Đăng ký thành công khóa học miễn phí",
-                   "enrollment_id": enrol.id
+                   "enrollment_id": enrol.data
                }, status=status.HTTP_201_CREATED)
 
        except Exception as e:
@@ -105,9 +114,7 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
    @action(methods=['post'], url_path='like', detail=True)
    def like_course(self, request, pk):
 
-
        student = request.user.student
-
        li, created = Like.objects.get_or_create(student=student, course=self.get_object())
 
        if not created:
@@ -125,26 +132,23 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
        serializer.is_valid(raise_exception=True)
 
        rate_value = serializer.validated_data.get('rate')
-       rating, created = Rating.objects.update_or_create(
+       rating = Rating.objects.update_or_create(
            student=request.user.student,
            course=self.get_object(),
            defaults={'rate': rate_value}
        )
-
-       serializers.CourseSerializer(self.get_object(), context={'request': request})
-
        return Response(serializers.RatingSerializer(rating).data, status=status.HTTP_200_OK)
 
 
 
-class LessonView(viewsets.ViewSet, generics.RetrieveAPIView):
+class LessonView(viewsets.ViewSet, generics.RetrieveAPIView, generics.DestroyAPIView, generics.UpdateAPIView):
     queryset = Lesson.objects.prefetch_related('tags').filter(active=True)
     serializer_class = serializers.LessonDetailSerializer
 
     def get_permissions(self):
-       if self.request.method.__eq__('POST'):
-           return [permissions.IsAuthenticated()]
-       return [permissions.AllowAny()]
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [perms.IsInstructorOfCourse()]
+        return [permissions.AllowAny()]
 
     @action(methods=['get', 'post'], url_path='comments', detail=True)
     def get_comments(self, request, pk):
@@ -172,30 +176,26 @@ class LessonView(viewsets.ViewSet, generics.RetrieveAPIView):
     def mark_completed(self, request, pk):
         lesson = self.get_object()
         student = request.user.student
+        enrollment = Enrollment.objects.filter(student=student, course=lesson.course).first()
 
-        is_enrolled = Enrollment.objects.filter(student=student, course=lesson.course).exists()
-        if not is_enrolled:
-            return Response({"detail": "Bạn chưa đăng ký khóa học này"},
-                            status=status.HTTP_403_FORBIDDEN)
-
-        ls, created = LessonStatus.objects.update_or_create(
-            student=student,
-            lesson=lesson,
-            defaults={'is_completed': True}
-        )
-
-        return Response({
-            "message": "Bạn đã hoàn thành bài học!",
-            "lesson": lesson.subject,
-            "is_completed": ls.is_completed,
-            "updated_date": ls.updated_date
-        }, status=status.HTTP_200_OK)
+        if enrollment:
+            LessonStatus.objects.update_or_create(
+                student=student, lesson=lesson,
+                defaults={'is_completed': True}
+            )
+            enrollment.update_progress()
+            return Response({
+                "message": "Đã hoàn thành bài học!",
+                "progress": f"{enrollment.progress}%",
+                "is_completed": enrollment.is_completed
+            })
+        return Response({"detail": "Lỗi: Không tìm thấy khóa học đăng ký"}, status=400)
 
 
 class UserView(viewsets.ViewSet, generics.CreateAPIView):
    queryset = User.objects.filter(is_active=True)
    serializer_class = serializers.UserSerializer
-   parser_classes = (parsers.MultiPartParser, parsers.FormParser, parsers.JSONParser)
+   parser_classes = (parsers.MultiPartParser,parsers.FormParser, parsers.JSONParser)
 
    @swagger_auto_schema(
        method='patch',
@@ -237,16 +237,6 @@ class UserView(viewsets.ViewSet, generics.CreateAPIView):
 
        serializer = serializers.UserSerializer(teachers, many=True)
        return Response(serializer.data, status=status.HTTP_200_OK)
-
-   @action(methods=['get'], url_path='all-user', detail=False)
-   def get_all_users(self, request):
-       return Response(serializers.UserSerializer(User.objects.all(), many=True).data, status=status.HTTP_200_OK)
-
-
-class EnrollmentView(viewsets.ViewSet, generics.ListAPIView):
-    queryset = Enrollment.objects.filter(active=True)
-    serializer_class = serializers.EnrollmentSerializer
-
 
 
 class CommentView(viewsets.ViewSet, generics.DestroyAPIView):

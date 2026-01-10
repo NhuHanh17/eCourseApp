@@ -5,6 +5,8 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from ckeditor.fields import RichTextField
 from cloudinary.models import CloudinaryField
+from django.db.models.signals import post_save, post_delete
+from django.dispatch import receiver
 
 
 # ==========================================================
@@ -70,11 +72,9 @@ class Student(User):
 
 
 class AdminProfile(User):
-    """ Kế thừa từ User: Chứa thông tin Quản trị viên """
     access_level = models.IntegerField(default=1)
     class Meta:
         verbose_name = "Quản trị viên"
-
 
 # ==========================================================
 # 2. CÁC MODEL QUẢN LÝ KHÓA HỌC
@@ -136,6 +136,7 @@ class Lesson(BaseModel):
 # ==========================================================
 # 3. TƯƠNG TÁC KẾ THỪA
 # ==========================================================
+
 class LessonInteraction(BaseModel):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, null=False, blank=False)
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, null=False, blank=False)
@@ -196,6 +197,26 @@ class Enrollment(BaseModel):
     class Meta:
         unique_together = ('student', 'course')
 
+    def update_progress(self):
+        total_lessons = self.course.duration
+        if total_lessons == 0:
+            return 0
+
+        completed_count = LessonStatus.objects.filter(
+                            student=self.student,
+                            lesson__course=self.course,
+                            is_completed=True).count()
+
+        self.progress = round((completed_count / total_lessons) * 100, 2)
+
+        if completed_count >= total_lessons:
+            self.is_completed = True
+        else:
+            self.is_completed = False
+        self.save()
+
+        return self.progress
+
 
 class Transaction(BaseModel):
     class PayMethods(models.TextChoices):
@@ -206,3 +227,9 @@ class Transaction(BaseModel):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     pay_method = models.CharField(max_length=50,choices=PayMethods.choices,default=PayMethods.CASH)
     status = models.BooleanField(default=False)
+
+
+
+@receiver([post_save, post_delete], sender=Lesson)
+def update_course_duration(sender, instance, **kwargs):
+    instance.course.update_duration()

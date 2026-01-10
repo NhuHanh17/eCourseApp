@@ -9,18 +9,16 @@ from courses.models import Course, Category, Teacher, Lesson, Student, Tag, Comm
 
 class LessonForm(forms.ModelForm):
     content = forms.CharField(widget=CKEditorUploadingWidget)
-
     class Meta:
         model = Lesson
         fields = '__all__'
 
 
-
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ('id', 'image_icon', 'name', 'category', 'fee', 'instructor')
+    list_display = ('id', 'image_icon', 'name', 'duration', 'category', 'fee', 'instructor')
     list_filter = ('category', 'instructor', 'fee')
     search_fields = ('name',)
-    readonly_fields = ('image_view',)
+    readonly_fields = ('duration', 'image_view', )
     filter_horizontal = ('tags',)
 
     def image_view(self, course):
@@ -30,39 +28,36 @@ class CourseAdmin(admin.ModelAdmin):
 
     def image_icon(self, course):
         if course.image:
-            return mark_safe(
-                f'<img src="{course.image.url}" width="50" height="50" style="object-fit: cover; border-radius: 5px;" />')
-        return "No Image"
+            return mark_safe(f'<img src="{course.image.url}" width="50" height="50" style="object-fit: cover; border-radius: 5px;" />')
+        return self.name
 
     image_icon.short_description = "Ảnh"
+
+
 
 
 class UserPhotoMixin:
     def photo_preview(self, obj):
         if obj.avatar:
-            # Cloudinary trả về object hoặc string tùy cách cấu hình, lấy .url cho chắc chắn
             url = obj.avatar.url if hasattr(obj.avatar, 'url') else obj.avatar
             return mark_safe(f'<img src="{url}" width="120" style="border-radius: 10px; border: 2px solid #ccc;" />')
         return "Chưa có ảnh"
-
-    photo_preview.short_description = "Xem trước ảnh"
+    photo_preview.short_description = "Avatar"
 
 
 @admin.register(Teacher)
 class TeacherAdmin(UserAdmin, UserPhotoMixin):
     list_display = ('username', 'email', 'is_verified', 'work_place')
     list_editable = ('is_verified',)
+    search_fields = ('first_name','last_name')
 
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
-        ('Thông tin cá nhân', {'fields': ('first_name', 'last_name', 'email', 'avatar', 'photo_preview')}),
-        ('Thông tin nghề nghiệp', {
-            'classes': ('collapse',),
-            'fields': ('bio', 'work_place', 'is_verified'),
-        }),
-        ('Quyền hạn', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
-        ('Ngày quan trọng', {'fields': ('last_login', 'date_joined')}),
+        ('Thông tin cá nhân:', {'fields': ('first_name', 'last_name', 'email', 'avatar', 'photo_preview')}),
+        ('Thông tin nghề nghiệp:', {'classes': ('collapse',),'fields': ('bio', 'work_place', 'is_verified'),}),
+        ('Thời gian:', {'fields': ('last_login', 'date_joined')}),
     )
+
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('Thông tin bổ sung', {
             'classes': ('wide',),
@@ -105,9 +100,9 @@ class LessonAdmin(admin.ModelAdmin):
 
 
 class MyAdminSite(admin.AdminSite):
-    site_header = 'HỆ THỐNG KHÓA HỌC ECourseApp'
+    site_header = 'ECourseApp'
     site_title = 'Quản trị viên Han'
-    index_title = 'Chào mừng Han đến với trang quản lý'
+    index_title = 'Chào mừng đến với trang quản lý'
 
 
 admin_site = MyAdminSite()

@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.db.models import Avg
+from django.db import transaction
 
-from courses.models import Course, Category, Lesson, Tag, Teacher, Student, User, Like
+from courses.models import Course, Category, Lesson, Tag, Teacher, Student, User, Like, LessonStatus
 from courses.models import Enrollment, Comment, Rating, Transaction
 from rest_framework import serializers
 from django.conf import settings
@@ -40,7 +41,7 @@ class CourseSerializer(ImageSerializer):
 
     class Meta:
         model = Course
-        fields = 'id', 'name', 'category', 'description' ,'created_date', 'image', 'tags', 'total_likes', 'avg_rating'
+        fields = 'id', 'name', 'category', 'description', 'duration', 'created_date', 'image', 'tags', 'total_likes', 'avg_rating'
 
     def get_total_likes(self, obj):
         return obj.like_set.filter(active=True).count()
@@ -67,7 +68,6 @@ class LessonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lesson
         fields = 'id', 'subject', 'created_date'
-        depth = 1
 
 
 class LessonDetailSerializer(LessonSerializer):
@@ -76,135 +76,121 @@ class LessonDetailSerializer(LessonSerializer):
         model = LessonSerializer.Meta.model
         fields = LessonSerializer.Meta.fields + ('tags','content')
 
+class LessonCreateSerializer(serializers.ModelSerializer):
+    tags = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.all(),required=False)
+
+    class Meta:
+        model = Lesson
+        fields = ['id', 'subject', 'content', 'created_date', 'tags']
+        extra_kwargs = {
+            'created_date': {'read_only': True},
+        }
+
+    def create(self, validated_data):
+        tags = validated_data.pop('tags', [])
+        lesson = Lesson.objects.create(**validated_data)
+        lesson.tags.set(tags)
+        return lesson
+
 
 class TeacherSerializer(serializers.ModelSerializer):
     class Meta:
         model = Teacher
-        fields = (
-           'bio',
-           'work_place',
-           'is_verified',
-        )
-        extra_kwargs = {
-            'is_verified': {'read_only': True},
-        }
+        fields = ('bio', 'work_place', 'is_verified')
+        read_only_fields = ('is_verified',)
+
 
 class StudentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Student
-        fields = (
-            'student_code',
-            'birth_date',
-        )
-        extra_kwargs = {
-            'student_code': {'read_only': True},
-        }
+        fields = ('student_code', 'birth_date')
+        read_only_fields = ('student_code',)
 
 
 class UserSerializer(serializers.ModelSerializer):
+
     teacher = TeacherSerializer(required=False)
     student = StudentSerializer(required=False)
 
     class Meta:
         model = User
         fields = (
-           'id',
-           'username',
-           'email',
-           'password',
-           'first_name',
-           'last_name',
-           'role',
-           'avatar',
-           'teacher',
-           'student',
+            'id', 'username', 'email', 'password',
+            'first_name', 'last_name', 'role', 'avatar',
+            'teacher', 'student'
         )
-
         extra_kwargs = {
-           'password': {'write_only': True},
+            'password': {'write_only': True},
         }
 
-    def create(self, validated_data):
-        role = validated_data.get("role")
-
-        teacher_data = validated_data.pop("teacher", {})
-        student_data = validated_data.pop("student", {})
-
-
-        if role == User.Role.STUDENT:
-            student = Student.objects.create_user(
-               username=validated_data["username"],
-               password=validated_data["password"],
-               email=validated_data.get("email"),
-               first_name=validated_data.get("first_name"),
-               last_name=validated_data.get("last_name"),
-               birth_date=student_data.get("birth_date"),
-            )
-            return student
-
-
-        if role == User.Role.TEACHER:
-            teacher = Teacher.objects.create_user(
-               username=validated_data["username"],
-               password=validated_data["password"],
-               email=validated_data.get("email"),
-               first_name=validated_data.get("first_name"),
-               last_name=validated_data.get("last_name"),
-               bio=teacher_data.get("bio"),
-               work_place=teacher_data.get("work_place"),
-               is_verified=False)
-            return teacher
-
-
     def to_internal_value(self, data):
-        data = data.dict()
+        if hasattr(data, 'dict'):
+            data = data.dict()
+
         for field in ['teacher', 'student']:
             if field in data and isinstance(data[field], str):
-                data[field] = json.loads(data[field])
+                try:
+                    data[field] = json.loads(data[field])
+                except json.JSONDecodeError:
+                    pass
         return super().to_internal_value(data)
 
+    @transaction.atomic
+    def create(self, validated_data):
+
+        teacher_data = validated_data.pop('teacher', None)
+        student_data = validated_data.pop('student', None)
+        role = validated_data.get('role')
+
+        if role == User.Role.TEACHER:
+            user = Teacher.objects.create_user(**validated_data, **(teacher_data or {}))
+        elif role == User.Role.STUDENT:
+            user = Student.objects.create_user(**validated_data, **(student_data or {}))
+        else:
+            user = User.objects.create_user(**validated_data)
+
+        return user
+
+    @transaction.atomic
     def update(self, instance, validated_data):
-        for attr in ['first_name', 'last_name', 'email', 'avatar']:
-            if attr in validated_data:
-                setattr(instance, attr, validated_data[attr])
+        teacher_data = validated_data.pop('teacher', None)
+        student_data = validated_data.pop('student', None)
+
+        for attr, value in validated_data.items():
+            if attr == 'password':
+                instance.set_password(value)
+            else:
+                setattr(instance, attr, value)
         instance.save()
 
-        if instance.role == User.Role.TEACHER:
-            teacher_data = validated_data.pop('teacher', None)
-            if teacher_data and hasattr(instance, 'teacher'):
-                serializer = TeacherSerializer(instance.teacher, data=teacher_data, partial=True)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
 
-        elif instance.role == User.Role.STUDENT:
-            student_data = validated_data.get('student')
-            if student_data and hasattr(instance, 'student'):
-                serializer = StudentSerializer(instance.student, data=student_data, partial=True)
-                serializer.is_valid(raise_exception=True)
-                serializer.save()
+        if instance.role == User.Role.TEACHER and teacher_data:
+            Teacher.objects.filter(pk=instance.pk).update(**teacher_data)
+        elif instance.role == User.Role.STUDENT and student_data:
+            Student.objects.filter(pk=instance.pk).update(**student_data)
 
         return instance
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        avatar = getattr(instance, 'avatar', None)
 
-        if hasattr(avatar, 'url'):
-            data['avatar'] = avatar.url
-        else:
-            data['avatar'] = ''
-        if instance.role == User.Role.TEACHER and 'teacher' in data and data['teacher']:
-            teacher_info = data.pop('teacher')
-            data.update(teacher_info)
+        if instance.avatar:
+            data['avatar'] = instance.avatar.url if hasattr(instance.avatar, 'url') else str(instance.avatar)
 
-        elif instance.role == User.Role.STUDENT and 'student' in data and data['student']:
-            student_info = data.pop('student')
-            data.update(student_info)
+        role_map = {
+            User.Role.TEACHER: 'teacher',
+            User.Role.STUDENT: 'student'
+        }
+
+        profile_key = role_map.get(instance.role)
+        if profile_key and data.get(profile_key):
+            profile_data = data.pop(profile_key)
+            data.update(profile_data)
 
         data.pop('teacher', None)
         data.pop('student', None)
-        return data
 
+        return data
 
 class UserDataSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
@@ -241,6 +227,7 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     class Meta:
            model = Enrollment
            fields = ['id', 'course','student','created_date', 'progress', 'is_completed']
+
 
 class RatingSerializer(serializers.ModelSerializer):
     course = CourseSerializer(read_only=True)
