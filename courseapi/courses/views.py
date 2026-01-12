@@ -77,9 +77,11 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
        course = self.get_object()
        student = request.user.student
 
+       if Enrollment.objects.filter(student=student, course=course).exists():
+           return Response({"detail": "Bạn đã đăng ký khóa học này rồi."}, status=status.HTTP_400_BAD_REQUEST)
+
        method = request.data.get('pay_method', Transaction.PayMethods.CASH)
        course_fee = getattr(course, 'fee', 0)
-
        try:
            with transaction.atomic():
                enrol = Enrollment.objects.create(student=student, course=course)
@@ -102,9 +104,12 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
                        "data": serializer.data
                    }, status=status.HTTP_201_CREATED)
 
+               course_data = serializers.CourseSerializer(course, context={'request': request}).data
+
                return Response({
                    "message": "Đăng ký thành công khóa học miễn phí",
-                   "enrollment_id": enrol.data
+                   "enrollment_id": enrol.id,
+                   "course": course_data,
                }, status=status.HTTP_201_CREATED)
 
        except Exception as e:
@@ -118,7 +123,7 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
        li, created = Like.objects.get_or_create(student=student, course=self.get_object())
 
        if not created:
-           li.active = not li.active
+           li.active = not li.activecour
            li.save()
 
        return Response({

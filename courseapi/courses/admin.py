@@ -2,9 +2,12 @@ from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django.contrib import admin
 from django import forms
 from django.contrib.auth.admin import UserAdmin
+from django.db.models import Count, Sum
+from django.db.models.functions import TruncDate, TruncMonth
+from django.template.response import TemplateResponse
 from django.utils.safestring import mark_safe
-from courses.models import Course, Category, Teacher, Lesson, Student, Tag, Comment, Enrollment
-
+from courses.models import Course, Category, Teacher, Lesson, Student, Tag, Comment, Enrollment, Transaction
+from django.urls import path
 
 
 class LessonForm(forms.ModelForm):
@@ -81,12 +84,12 @@ class StudentAdmin(UserAdmin, UserPhotoMixin):
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Thông tin sinh viên',
-         {'fields': ('student_code', 'first_name', 'last_name', 'email', 'birth_date', 'avatar', 'photo_preview')}),
+         {'fields': ('first_name', 'last_name', 'email', 'birth_date', 'avatar', 'photo_preview')}),
     )
 
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('Thông tin bắt buộc', {
-            'fields': ('student_code', 'email', 'first_name', 'last_name', 'birth_date', 'avatar'),
+            'fields': ('email', 'first_name', 'last_name', 'birth_date', 'avatar'),
         }),
     )
 
@@ -101,8 +104,42 @@ class LessonAdmin(admin.ModelAdmin):
 
 class MyAdminSite(admin.AdminSite):
     site_header = 'ECourseApp'
-    site_title = 'Quản trị viên Han'
+    site_title = 'Quản trị viên'
     index_title = 'Chào mừng đến với trang quản lý'
+
+    def get_urls(self):
+        return [path('stats-view/', self.admin_view(self.stats_view))] + super().get_urls()
+
+    def stats_view(self, request):
+        course_stats = Category.objects.annotate(
+            count=Count('courses')
+        ).values('name', 'count')
+
+        total_revenue = Transaction.objects.filter(status=True).aggregate(
+            total=Sum('amount')
+        )['total'] or 0
+
+        registration_trend = (
+            Enrollment.objects.annotate(month=TruncMonth('created_date'))
+            .values('month')
+            .annotate(count=Count('id'))
+            .order_by('month')
+        )
+
+        course_enrollment_details = Course.objects.annotate(
+            student_count=Count('enrollments')
+        ).values('name', 'student_count').order_by('-student_count')[:10]
+
+        context = {
+            **self.each_context(request),
+            'course_stats': course_stats,
+            'total_revenue': total_revenue,
+            'registration_trend': registration_trend,
+            'course_enrollment_details': course_enrollment_details,
+            'total_courses': Course.objects.count(),
+            'total_students': Student.objects.count(),
+        }
+        return TemplateResponse(request, 'admin/stats.html', context)
 
 
 admin_site = MyAdminSite()
