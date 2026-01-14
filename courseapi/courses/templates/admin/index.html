@@ -1,0 +1,70 @@
+{% extends "admin/index.html" %}
+
+{% block content_title %}
+    {{ block.super }}
+
+    <div style="
+        margin: 20px 0 30px 0;
+        padding: 30px;
+        background: linear-gradient(135deg, #1e3a4a 0%, #2c5364 100%);
+        border-radius: 15px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid rgba(255,255,255,0.1);
+        position: relative;
+        overflow: hidden;
+    ">
+        <div style="position: absolute; right: -50px; top: -50px; width: 150px; height: 150px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+
+        <div style="flex: 1; z-index: 1;">
+            <h2 style="
+                margin: 0 0 12px 0;
+                color: #f5dd5d;
+                font-size: 1.8rem;
+                font-weight: 700;
+                text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+                display: flex;
+                align-items: center;
+                gap: 15px;
+            ">
+                <span style="font-size: 2.2rem;">📊</span> Trung tâm Phân tích Chiến lược
+            </h2>
+            <p style="
+                margin: 0;
+                color: #d1d1d1;
+                font-size: 1.05rem;
+                line-height: 1.6;
+                max-width: 600px;
+            ">
+                Hệ thống báo cáo<strong> doanh thu</strong>,
+                biến động <strong>đăng ký</strong> và cơ cấu <strong>khóa học</strong>
+            </p>
+        </div>
+
+        <div style="z-index: 1;">
+            <a href="/admin/stats-view/" style="
+                background: #f5dd5d;
+                color: #1e3a4a;
+                padding: 14px 28px;
+                text-decoration: none;
+                border-radius: 12px;
+                font-weight: 800;
+                font-size: 1.1rem;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                transition: all 0.3s ease;
+                box-shadow: 0 5px 15px rgba(245, 221, 93, 0.3);
+            " onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 8px 20px rgba(245, 221, 93, 0.4)';"
+               onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 5px 15px rgba(245, 221, 93, 0.3)';"
+            >
+                <span>Xem Báo Cáo Chi Tiết</span>
+                <svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path d="M13 7l5 5m0 0l-5 5m5-5H6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </a>
+        </div>
+    </div>
+{% endblock %}

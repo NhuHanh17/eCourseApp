@@ -9,19 +9,22 @@ from django.db import transaction
 
 from courses import serializers, paginators, perms
 from courses.models import Category, Course, Lesson, User, Comment, Like, Enrollment, Teacher, Rating, Transaction, LessonStatus
+from courses.models import Student
 from courses.paginators import ItemPagination
 
 
-class CategoryView(viewsets.ViewSet, generics.ListAPIView):
+class CategoryView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView):
    queryset = Category.objects.all()
    serializer_class = serializers.CategorySerializer
+   parser_classes = (parsers.MultiPartParser, parsers.FormParser)
+   permission_classes = [perms.IsGiangVienOrReadOnly]
 
 
-class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView, generics.UpdateAPIView):
-   queryset = Course.objects.filter(active=True)
+class CourseView(viewsets.ModelViewSet):
+   queryset = Course.objects.select_related('instructor__user_ptr', 'category').filter(active=True)
    serializer_class = serializers.CourseSerializer
    pagination_class = ItemPagination
-   parsers_classes = [parsers.MultiPartParser, parsers.FormParser]
+   parser_classes = [parsers.MultiPartParser, parsers.FormParser]
    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
    def get_permissions(self):
@@ -31,6 +34,10 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
            return [perms.IsVerifiedTeacher(), perms.IsInstructorOfCourse()]
        return [permissions.AllowAny()]
 
+   def get_serializer_class(self):
+       if self.action in ['create', 'partial_update']:
+           return serializers.CourseCreateSerializer
+       return self.serializer_class
 
    def get_queryset(self):
        query = self.queryset
@@ -46,14 +53,30 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
            query = query.filter(tags__id=tag_id)
        return query.distinct()
 
-
    def perform_create(self, serializer):
        serializer.save(instructor=self.request.user.teacher)
 
    def perform_update(self, serializer):
        serializer.save(instructor=self.request.user.teacher)
 
-   @action(methods=['get', 'post'], url_path='lessons', detail=True)
+   def destroy(self, request, *args, **kwargs):
+       course = self.get_object()
+
+       if course.duration and course.duration > 0:
+           return Response(
+               {"detail": "Không thể xóa(ẩn) khóa học có bài học! "},
+               status=status.HTTP_400_BAD_REQUEST
+           )
+       course.active = False
+       course.save()
+
+       return Response(
+           {"detail": "Khóa học đã được xóa(ẩn) thành công."},
+           status=status.HTTP_204_NO_CONTENT
+       )
+
+   @action(methods=['get', 'post'], url_path='lessons', detail=True,
+                                                serializer_class=serializers.LessonCreateSerializer)
    def get_lessons(self, request, pk):
         course = self.get_object()
 
@@ -61,7 +84,8 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
             teacher_profile = getattr(request.user, 'teacher', None)
 
             if teacher_profile is None or course.instructor != teacher_profile:
-                return Response({"detail": "Bạn không có quyền thêm bài học vào khóa học này"},status=status.HTTP_403_FORBIDDEN)
+                return Response({"detail": "Bạn không có quyền thêm bài học vào khóa học này"}
+                                ,status=status.HTTP_403_FORBIDDEN)
 
             serializer = serializers.LessonCreateSerializer(data=request.data)
             if serializer.is_valid():
@@ -72,13 +96,14 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
         lessons = course.lessons.filter(active=True)
         return Response(serializers.LessonSerializer(lessons, many=True).data, status=status.HTTP_200_OK)
 
-   @action(methods=['post'], url_path='enroll', detail=True)
+   @action(methods=['post'], url_path='enroll', detail=True, serializer_class = serializers.EnrollmentSerializer)
    def enroll(self, request, pk):
        course = self.get_object()
        student = request.user.student
 
        if Enrollment.objects.filter(student=student, course=course).exists():
-           return Response({"detail": "Bạn đã đăng ký khóa học này rồi."}, status=status.HTTP_400_BAD_REQUEST)
+           return Response({"detail": "Bạn đã đăng ký khóa học này rồi."},
+                                            status=status.HTTP_400_BAD_REQUEST)
 
        method = request.data.get('pay_method', Transaction.PayMethods.CASH)
        course_fee = getattr(course, 'fee', 0)
@@ -116,7 +141,7 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
            return Response({"detail": f"Lỗi: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-   @action(methods=['post'], url_path='like', detail=True)
+   @action(methods=['post'], url_path='like', detail=True, serializer_class = serializers.LikeSerializer)
    def like_course(self, request, pk):
 
        student = request.user.student
@@ -131,7 +156,7 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
            "detail": "Đã thích khóa học" if li.active else "Đã bỏ thích khóa học"
        }, status=status.HTTP_200_OK)
 
-   @action(methods=['post'], url_path='rating', detail=True)
+   @action(methods=['post'], url_path='rating', detail=True, serializer_class=serializers.RatingSerializer)
    def rate_course(self, request, pk):
        serializer = serializers.RatingSerializer(data=request.data)
        serializer.is_valid(raise_exception=True)
@@ -149,11 +174,43 @@ class CourseView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView,
 class LessonView(viewsets.ViewSet, generics.RetrieveAPIView, generics.DestroyAPIView, generics.UpdateAPIView):
     queryset = Lesson.objects.prefetch_related('tags').filter(active=True)
     serializer_class = serializers.LessonDetailSerializer
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
             return [perms.IsInstructorOfCourse()]
         return [permissions.AllowAny()]
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        user = request.user
+
+        if user.role == User.Role.TEACHER:
+            if instance.course.instructor == getattr(user, 'teacher', None):
+                return super().retrieve(request, *args, **kwargs)
+            return Response({"detail": "Bạn không phải giảng viên của khóa học này."},
+                            status=status.HTTP_403_FORBIDDEN)
+
+        if user.role == User.Role.STUDENT:
+            is_enrolled = Enrollment.objects.filter(
+                student=getattr(user, 'student', None),
+                course=instance.course
+            ).exists()
+
+            if is_enrolled:
+                return super().retrieve(request, *args, **kwargs)
+
+            return Response(
+                {"detail": "Bạn cần đăng ký khóa học này để xem nội dung bài học."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        return Response({"detail": "Không thể truy cập khóa học."}, status=status.HTTP_403_FORBIDDEN)
+
+
+    def perform_destroy(self, instance):
+        instance.active = False
+        instance.save()
 
     @action(methods=['get', 'post'], url_path='comments', detail=True)
     def get_comments(self, request, pk):
@@ -243,9 +300,31 @@ class UserView(viewsets.ViewSet, generics.CreateAPIView):
        serializer = serializers.UserSerializer(teachers, many=True)
        return Response(serializer.data, status=status.HTTP_200_OK)
 
+   @action(methods=['get'], url_path='chat-students', detail=False, permission_classes=[permissions.IsAuthenticated])
+   def get_chat_students(self, request):
+       students = User.objects.filter(
+           role=User.Role.STUDENT,
+           is_active=True
+       ).exclude(id=request.user.id)
+
+       serializer = serializers.ChatUserSerializer(students, many=True, context={'request': request})
+       return Response(serializer.data, status=status.HTTP_200_OK)
+
+   @action(methods=['get'], url_path='chat-teachers', detail=False, permission_classes=[permissions.IsAuthenticated])
+   def get_chat_teachers(self, request):
+       teachers = User.objects.filter(
+           role=User.Role.TEACHER,
+           is_active=True
+       )
+
+       serializer = serializers.ChatUserSerializer(teachers, many=True, context={'request': request})
+       return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class CommentView(viewsets.ViewSet, generics.DestroyAPIView):
     queryset = Comment.objects.filter(active=True)
     serializer_class = serializers.CommentSerializer
     permission_classes = [perms.CommentOwner]
+
+
 

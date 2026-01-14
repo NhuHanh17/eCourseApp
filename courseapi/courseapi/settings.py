@@ -9,17 +9,14 @@ https://docs.djangoproject.com/en/6.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
-
 from pathlib import Path
-
-from django.conf.global_settings import AUTH_USER_MODEL
 import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-MEDIA_ROOT = '%s/courses/static/' % BASE_DIR
+MEDIA_ROOT = None
+MEDIA_URL = '/media/'
 
 
 # Quick-start development settings - unsuitable for production
@@ -27,50 +24,29 @@ MEDIA_ROOT = '%s/courses/static/' % BASE_DIR
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-o=y&&8ycu(4w=@%(2mbfeh519whzo%%z8)=t&=n0)s+p6(k4_u'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = ['*']
 
 
 # Application definition
-
 INSTALLED_APPS = [
+    'cloudinary_storage',
+    'cloudinary',
+    'courses.apps.CoursesConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'courses.apps.CoursesConfig',
     'ckeditor',
     'ckeditor_uploader',
     'rest_framework',
     'drf_yasg',
     'oauth2_provider',
-    'cloudinary',
-    'cloudinary_storage',
 ]
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
-
-import cloudinary
-import cloudinary.uploader
-import cloudinary.api
-cloudinary.config(
-  	cloud_name = "dinusoo6h",
-  	api_key = "113676918263236",
-  	api_secret = "4XJvP2A8bOzrRetOrVard941L_Q"
-)
-
-
-CKEDITOR_UPLOAD_PATH = '/static/images/ckeditors'
-
-REST_FRAMEWORK = {
-                'DEFAULT_AUTHENTICATION_CLASSES': (
-                        'oauth2_provider.contrib.rest_framework.OAuth2Authentication',)
-}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -84,10 +60,11 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'courseapi.urls'
 
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -104,10 +81,6 @@ WSGI_APPLICATION = 'courseapi.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-
-
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
@@ -116,27 +89,11 @@ DATABASES = {
         'PASSWORD': '111111',
         'HOST': '',
         'OPTIONS': {
-                    'init_command': "SET sql_mode='STRICT_TRANS_TABLES', NAMES 'utf8mb4'",
-                    'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES', NAMES 'utf8mb4'",
+            'charset': 'utf8mb4',
         },
     }
 }
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'Nhuhanh17$coursesdb',
-#         'USER': 'Nhuhanh17',
-#         'PASSWORD': 'Baitaplon17',
-#         'HOST': 'Nhuhanh17.mysql.pythonanywhere-services.com',
-#         'PORT': '3306',
-#         'OPTIONS': {
-#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES', NAMES 'utf8mb4'",
-#         },
-#     }
-# }
-
-
 
 import pymysql
 pymysql.install_as_MySQLdb()
@@ -144,11 +101,15 @@ pymysql.version_info = (2, 2, 1, "final", 0)
 
 AUTH_USER_MODEL = 'courses.User'
 
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'oauth2_provider.contrib.rest_framework.OAuth2Authentication',
+    )
+}
 
 OAUTH2_PROVIDER = {
     'ACCESS_TOKEN_EXPIRE_SECONDS': 31536000,
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -168,6 +129,28 @@ AUTH_PASSWORD_VALIDATORS = [
     # },
 ]
 
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': 'dinusoo6h',
+    'API_KEY': '113676918263236',
+    'API_SECRET': '4XJvP2A8bOzrRetOrVard941L_Q',
+}
+
+
+CKEDITOR_UPLOAD_PATH = 'ckupload/'
+
+CKEDITOR_STORAGE_BACKEND = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+CKEDITOR_CONFIGS = {
+    'default': {
+        'toolbar': 'full',
+        'height': 300,
+        'width': '100%',
+        'filebrowserUploadUrl': '/ckeditor/upload/',
+        'filebrowserBrowseUrl': '/ckeditor/browse/',
+    }
+}
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
@@ -184,6 +167,6 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
-PUBLIC_IMAGE = 'https://nhuhanh17.pythonanywhere.com/image_static'
+STATIC_URL = '/static/'
+
+

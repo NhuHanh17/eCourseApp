@@ -1,5 +1,6 @@
 import datetime
 
+from ckeditor_uploader.fields import RichTextUploadingField
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.contrib.auth.models import AbstractUser
@@ -116,12 +117,20 @@ class Course(BaseModel):
     instructor = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='courses')
     tags = models.ManyToManyField(Tag, blank=True, related_name='courses')
 
+    class Meta:
+        unique_together = ('name', 'instructor', 'fee')
+
     def __str__(self):
         return self.name
 
+    def update_duration(self):
+        count = self.lessons.filter(active=True).count()
+        self.duration = count
+        self.save(update_fields=['duration'])
+
 class Lesson(BaseModel):
     subject = models.CharField(max_length=255)
-    content = RichTextField()
+    content = RichTextUploadingField()
     video_url = models.URLField(null=True, blank=True)
     course = models.ForeignKey(Course, on_delete=models.RESTRICT, related_name='lessons')
     tags = models.ManyToManyField(Tag, blank=True, related_name='lessons')

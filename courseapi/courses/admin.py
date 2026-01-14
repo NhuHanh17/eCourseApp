@@ -17,8 +17,13 @@ class LessonForm(forms.ModelForm):
         fields = '__all__'
 
 
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
+
+
 class CourseAdmin(admin.ModelAdmin):
-    list_display = ('id', 'image_icon', 'name', 'duration', 'category', 'fee', 'instructor')
+    list_display = ('id', 'image_icon', 'name', 'duration', 'category', 'fee', 'instructor','active')
     list_filter = ('category', 'instructor', 'fee')
     search_fields = ('name',)
     readonly_fields = ('duration', 'image_view', )
@@ -97,7 +102,7 @@ class StudentAdmin(UserAdmin, UserPhotoMixin):
 
 class LessonAdmin(admin.ModelAdmin):
     form = LessonForm
-    list_display = ('subject', 'course', 'created_date')
+    list_display = ('id', 'subject', 'course', 'created_date')
     search_fields = ('subject',)
     filter_horizontal = ('tags',)
 
@@ -145,7 +150,7 @@ class MyAdminSite(admin.AdminSite):
 admin_site = MyAdminSite()
 
 admin_site.register(Course, CourseAdmin)
-admin_site.register(Category)
+admin_site.register(Category, CategoryAdmin)
 admin_site.register(Teacher, TeacherAdmin)
 admin_site.register(Student, StudentAdmin)
 admin_site.register(Lesson, LessonAdmin)

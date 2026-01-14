@@ -1,27 +1,30 @@
 from django.conf import settings
 from django.db.models import Avg
 from django.db import transaction
+from rest_framework.exceptions import ValidationError
+from rest_framework.validators import UniqueTogetherValidator
 
 from courses.models import Course, Category, Lesson, Tag, Teacher, Student, User, Like, LessonStatus
 from courses.models import Enrollment, Comment, Rating, Transaction
 from rest_framework import serializers
-from django.conf import settings
+
 
 import json
 
 
 class ImageSerializer(serializers.ModelSerializer):
-   def to_representation(self, instance):
-       ret = super().to_representation(instance)
-       if instance.image:
-           image_url = instance.image.url
-           if image_url.startswith('http://') or image_url.startswith('https://'):
-               ret['image'] = image_url
-           else:
-               ret['image'] = f"{settings.PUBLIC_IMAGE}{image_url}"
-       else:
-           ret['image'] = None
-       return ret
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['image'] = instance.image.url
+
+        return data
+
+
+class AvatarSerializer(serializers.ModelSerializer):
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['avatar'] = instance.avatar.url
+        return data
 
 class CategorySerializer(serializers.ModelSerializer):
    class Meta:
@@ -39,9 +42,20 @@ class CourseSerializer(ImageSerializer):
     total_likes = serializers.SerializerMethodField()
     avg_rating = serializers.SerializerMethodField()
 
+    # Nếu Teacher kế thừa User
+    instructor_name = serializers.CharField(
+        source='instructor.get_full_name',
+        read_only=True
+    )
+
     class Meta:
         model = Course
-        fields = 'id', 'name', 'category', 'description', 'duration', 'created_date', 'image', 'tags', 'total_likes', 'avg_rating'
+        fields = [
+            'id', 'name', 'category', 'description', 'duration', 'fee',
+            'instructor_name',
+            'created_date', 'image', 'tags',
+            'total_likes', 'avg_rating'
+        ]
 
     def get_total_likes(self, obj):
         return obj.like_set.filter(active=True).count()
@@ -56,12 +70,36 @@ class CourseCreateSerializer(CourseSerializer):
     tags = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.all(), required=False)
     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
     instructor = serializers.PrimaryKeyRelatedField(read_only=True)
+    image = serializers.ImageField(required=False)
 
-    class Meta:
-        fields = CourseSerializer.Meta.fields + ('instructor',)
+    class Meta(CourseSerializer.Meta):
+        fields = CourseSerializer.Meta.fields + ['instructor']
         extra_kwargs = {
             'image': {'required': False},
+            'duration': {'read_only': True},
+            'description': {'required': False},
         }
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        if not request or not hasattr(request.user, 'teacher'):
+            raise ValidationError("Người dùng hiện tại không phải là giảng viên.")
+
+        instructor = request.user.teacher
+        name = attrs.get('name')
+        fee = attrs.get('fee')
+
+        instance = self.instance
+        queryset = Course.objects.filter(instructor=instructor, name=name, fee=fee)
+
+        if instance:
+            queryset = queryset.exclude(pk=instance.pk)
+
+        if queryset.exists():
+            raise ValidationError({
+                "non_field_errors": ["Bạn đã có một khóa học với tên và mức giá này rồi!"]
+            })
+        return attrs
 
 
 class LessonSerializer(serializers.ModelSerializer):
@@ -77,11 +115,10 @@ class LessonDetailSerializer(LessonSerializer):
         fields = LessonSerializer.Meta.fields + ('tags','content')
 
 class LessonCreateSerializer(serializers.ModelSerializer):
-    tags = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.all(),required=False)
+    tags = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.all(), required=False)
 
-    class Meta:
-        model = Lesson
-        fields = ['id', 'subject', 'content', 'created_date', 'tags']
+    class Meta(LessonSerializer.Meta):
+        fields = LessonSerializer.Meta.fields + ('content', 'tags')
         extra_kwargs = {
             'created_date': {'read_only': True},
         }
@@ -107,7 +144,9 @@ class StudentSerializer(serializers.ModelSerializer):
         read_only_fields = ('student_code',)
 
 
-class UserSerializer(serializers.ModelSerializer):
+
+
+class UserSerializer(AvatarSerializer):
 
     teacher = TeacherSerializer(required=False)
     student = StudentSerializer(required=False)
@@ -174,9 +213,6 @@ class UserSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
 
-        if instance.avatar:
-            data['avatar'] = instance.avatar.url if hasattr(instance.avatar, 'url') else str(instance.avatar)
-
         role_map = {
             User.Role.TEACHER: 'teacher',
             User.Role.STUDENT: 'student'
@@ -191,6 +227,7 @@ class UserSerializer(serializers.ModelSerializer):
         data.pop('student', None)
 
         return data
+
 
 class UserDataSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
@@ -211,15 +248,21 @@ class CommentSerializer(UserDataSerializer):
             }
         }
 
+class LikeSerializer(serializers.ModelSerializer):
+    student = serializers.SerializerMethodField()
 
-class LikeSerializer(UserDataSerializer):
     class Meta:
         model = Like
-        fields = ('id', 'user', 'lesson')
-        extra_kwargs = {
-            'lesson' :{
-                'write_only': "True"
-            }
+        fields = ['id', 'student', 'active', 'created_date']
+        read_only_fields = ['active', 'student']
+
+    def get_student(self, obj):
+        user = obj.student.user
+        return {
+            "id": user.id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name
         }
 
 class EnrollmentSerializer(serializers.ModelSerializer):
@@ -243,3 +286,11 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = ['id', 'amount', 'pay_method', 'pay_method_display', 'status', 'student_name', 'created_date']
+
+
+class ChatUserSerializer(AvatarSerializer):
+    full_name = serializers.ReadOnlyField(source='get_full_name')
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'full_name', 'avatar', 'role']
