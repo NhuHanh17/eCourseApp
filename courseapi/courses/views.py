@@ -1,16 +1,18 @@
 from django.contrib.admindocs.utils import parse_rst
-from django.db.models.functions import Coalesce
-from django.utils.translation.trans_null import activate
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets, generics, status, parsers, permissions
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db import transaction
-from django.db.models import Count, Avg, Q
 from courses import serializers, paginators, perms
 from courses.models import Category, Course, Lesson, User, Comment, Like, Enrollment
 from courses.models import  Teacher, Rating, Transaction, LessonStatus, Tag
+from django.db.models import Count, Avg, Q, Exists, OuterRef,Value, BooleanField
+from django.db.models.functions import Coalesce
+
+
 
 from courses.paginators import ItemPagination
 
@@ -74,6 +76,29 @@ class CourseView(viewsets.ModelViewSet):
        instructor_id = self.request.query_params.get('instructor_id')
        if instructor_id:
            query = query.filter(instructor_id=instructor_id)
+
+       user = self.request.user
+       if user.is_authenticated and hasattr(user, 'student'):
+           query = query.annotate(
+               is_liked_by_me=Exists(
+                   Like.objects.filter(
+                       course=OuterRef('pk'),
+                       student=user.student,
+                       active=True
+                   )
+               ),
+               is_enrolled_by_me=Exists(
+                   Enrollment.objects.filter(
+                       course=OuterRef('pk'),
+                       student=user.student
+                   )
+               )
+           )
+       else:
+           query = query.annotate(
+               is_liked_by_me=Value(False, output_field=BooleanField()),
+               is_enrolled_by_me=Value(False, output_field=BooleanField())
+           )
 
        return query.distinct()
 

@@ -1,4 +1,5 @@
 from rest_framework import permissions
+from courses.models import User, Enrollment
 
 class CommentOwner(permissions.IsAuthenticated):
     def has_object_permission(self, request, view, comment):
@@ -28,5 +29,24 @@ class IsInstructorOfCourse(permissions.BasePermission):
         if hasattr(obj, 'course'):
             return obj.course.instructor == request.user.teacher
 
+        return False
+
+class IsEnrolledStudentOrCourseTeacher(permissions.BasePermission):
+    def has_permission(self, request, view):
+        return True
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        if not user.is_authenticated:
+            return False
+
+        if user.role == User.Role.TEACHER:
+            return hasattr(user, 'teacher') and obj.instructor == user.teacher
+
+        if user.role == User.Role.STUDENT:
+            return Enrollment.objects.filter(
+                student=user.student,
+                course=obj
+            ).exists()
         return False
 

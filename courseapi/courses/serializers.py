@@ -41,10 +41,9 @@ class CourseSerializer(ImageSerializer):
     total_likes = serializers.IntegerField(read_only=True)
     avg_rating = serializers.FloatField(read_only=True)
 
-    instructor_name = serializers.CharField(
-        source='instructor.get_full_name',
-        read_only=True
-    )
+    instructor_name = serializers.CharField(source='instructor.get_full_name',read_only=True)
+    is_liked_by_me = serializers.BooleanField(read_only=True)
+    is_enrolled_by_me = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Course
@@ -52,7 +51,8 @@ class CourseSerializer(ImageSerializer):
             'id', 'name', 'category', 'description', 'duration', 'fee',
             'instructor_name',
             'created_date', 'image', 'tags',
-            'total_likes', 'avg_rating'
+            'total_likes', 'avg_rating',
+            'is_liked_by_me', 'is_enrolled_by_me'
         ]
 
 
