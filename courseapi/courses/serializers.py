@@ -32,6 +32,9 @@ class TagSerializer(serializers.ModelSerializer):
    class Meta:
        model = Tag
        fields = '__all__'
+       extra_kwargs = {
+           'active': {'read_only': True},
+       }
 
 class CourseSerializer(ImageSerializer):
     tags = TagSerializer(many=True, read_only=True)
@@ -128,8 +131,6 @@ class StudentSerializer(serializers.ModelSerializer):
         model = Student
         fields = ('student_code', 'birth_date')
         read_only_fields = ('student_code',)
-
-
 
 
 class UserSerializer(AvatarSerializer):

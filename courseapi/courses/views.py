@@ -1,5 +1,6 @@
 from django.contrib.admindocs.utils import parse_rst
 from django.db.models.functions import Coalesce
+from django.utils.translation.trans_null import activate
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets, generics, status, parsers, permissions
 from rest_framework.decorators import action
@@ -8,7 +9,9 @@ from rest_framework.response import Response
 from django.db import transaction
 from django.db.models import Count, Avg, Q
 from courses import serializers, paginators, perms
-from courses.models import Category, Course, Lesson, User, Comment, Like, Enrollment, Teacher, Rating, Transaction, LessonStatus
+from courses.models import Category, Course, Lesson, User, Comment, Like, Enrollment
+from courses.models import  Teacher, Rating, Transaction, LessonStatus, Tag
+
 from courses.paginators import ItemPagination
 
 
@@ -18,6 +21,11 @@ class CategoryView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIVie
    parser_classes = (parsers.MultiPartParser, parsers.FormParser)
    permission_classes = [perms.IsGiangVienOrReadOnly]
 
+class TagView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIView):
+    queryset = Tag.objects.filter(active=True)
+    serializer_class = serializers.TagSerializer
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
+    permission_classes = [perms.IsGiangVienOrReadOnly]
 
 class CourseView(viewsets.ModelViewSet):
    queryset = (Course.objects.filter(active=True)
@@ -62,6 +70,11 @@ class CourseView(viewsets.ModelViewSet):
        tag_id = self.request.query_params.get('tag_id')
        if tag_id:
            query = query.filter(tags__id=tag_id)
+
+       instructor_id = self.request.query_params.get('instructor_id')
+       if instructor_id:
+           query = query.filter(instructor_id=instructor_id)
+
        return query.distinct()
 
    def perform_create(self, serializer):
