@@ -2,13 +2,10 @@ from django.conf import settings
 from django.db.models import Avg
 from django.db import transaction
 from rest_framework.exceptions import ValidationError
-from rest_framework.validators import UniqueTogetherValidator
 
 from courses.models import Course, Category, Lesson, Tag, Teacher, Student, User, Like, LessonStatus
 from courses.models import Enrollment, Comment, Rating, Transaction
 from rest_framework import serializers
-
-
 import json
 
 
@@ -19,12 +16,12 @@ class ImageSerializer(serializers.ModelSerializer):
 
         return data
 
-
 class AvatarSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data['avatar'] = instance.avatar.url
         return data
+
 
 class CategorySerializer(serializers.ModelSerializer):
    class Meta:
@@ -36,13 +33,11 @@ class TagSerializer(serializers.ModelSerializer):
        model = Tag
        fields = '__all__'
 
-
 class CourseSerializer(ImageSerializer):
     tags = TagSerializer(many=True, read_only=True)
-    total_likes = serializers.SerializerMethodField()
-    avg_rating = serializers.SerializerMethodField()
+    total_likes = serializers.IntegerField(read_only=True)
+    avg_rating = serializers.FloatField(read_only=True)
 
-    # Nếu Teacher kế thừa User
     instructor_name = serializers.CharField(
         source='instructor.get_full_name',
         read_only=True
@@ -56,14 +51,6 @@ class CourseSerializer(ImageSerializer):
             'created_date', 'image', 'tags',
             'total_likes', 'avg_rating'
         ]
-
-    def get_total_likes(self, obj):
-        return obj.like_set.filter(active=True).count()
-
-    def get_avg_rating(self, obj):
-        avg = obj.rating_set.aggregate(Avg('rate'))['rate__avg']
-        return round(avg, 1) if avg else 0
-
 
 
 class CourseCreateSerializer(CourseSerializer):
@@ -106,7 +93,6 @@ class LessonSerializer(serializers.ModelSerializer):
     class Meta:
         model = Lesson
         fields = 'id', 'subject', 'created_date'
-
 
 class LessonDetailSerializer(LessonSerializer):
     tags = TagSerializer(many=True)
@@ -229,6 +215,15 @@ class UserSerializer(AvatarSerializer):
         return data
 
 
+class ChatUserSerializer(AvatarSerializer):
+    full_name = serializers.ReadOnlyField(source='get_full_name')
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'full_name', 'avatar', 'role']
+
+
+
 class UserDataSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -286,11 +281,3 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = ['id', 'amount', 'pay_method', 'pay_method_display', 'status', 'student_name', 'created_date']
-
-
-class ChatUserSerializer(AvatarSerializer):
-    full_name = serializers.ReadOnlyField(source='get_full_name')
-
-    class Meta:
-        model = User
-        fields = ['id', 'username', 'full_name', 'avatar', 'role']

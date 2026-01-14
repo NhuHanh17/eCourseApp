@@ -1,15 +1,14 @@
 from django.contrib.admindocs.utils import parse_rst
+from django.db.models.functions import Coalesce
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import viewsets, generics, status, parsers, permissions
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
 from django.db import transaction
-
+from django.db.models import Count, Avg, Q
 from courses import serializers, paginators, perms
 from courses.models import Category, Course, Lesson, User, Comment, Like, Enrollment, Teacher, Rating, Transaction, LessonStatus
-from courses.models import Student
 from courses.paginators import ItemPagination
 
 
@@ -21,7 +20,19 @@ class CategoryView(viewsets.ViewSet, generics.ListAPIView, generics.CreateAPIVie
 
 
 class CourseView(viewsets.ModelViewSet):
-   queryset = Course.objects.select_related('instructor__user_ptr', 'category').filter(active=True)
+   queryset = (Course.objects.filter(active=True)
+               .select_related('instructor__user_ptr', 'category')
+               .prefetch_related('tags').filter(active=True)
+               .annotate(
+                   total_likes=Count(
+                       'like',
+                       filter=Q(like__active=True),
+                       distinct=True
+                   ),
+                   avg_rating=Coalesce(
+                       Avg('rating__rate'),0.0)
+               ))
+
    serializer_class = serializers.CourseSerializer
    pagination_class = ItemPagination
    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
@@ -148,7 +159,7 @@ class CourseView(viewsets.ModelViewSet):
        li, created = Like.objects.get_or_create(student=student, course=self.get_object())
 
        if not created:
-           li.active = not li.activecour
+           li.active = not li.active
            li.save()
 
        return Response({
