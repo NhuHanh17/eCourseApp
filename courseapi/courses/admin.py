@@ -106,6 +106,17 @@ class LessonAdmin(admin.ModelAdmin):
     search_fields = ('subject',)
     filter_horizontal = ('tags',)
 
+class EnrollmentAdmin(admin.ModelAdmin):
+    list_display = ('id', 'get_course_name', 'get_instructor_name','created_date', 'active')
+
+    @admin.display(ordering='course', description='Tên khóa học')
+    def get_course_name(self, obj):
+        return obj.course.name
+    
+    @admin.display(ordering='course__instructor', description='Giảng viên')
+    def get_instructor_name(self, obj):
+        instructor = obj.course.instructor
+        return f"{instructor.first_name} {instructor.last_name}" if instructor.first_name else instructor.username
 
 class MyAdminSite(admin.AdminSite):
     site_header = 'ECourseApp'
@@ -156,4 +167,4 @@ admin_site.register(Student, StudentAdmin)
 admin_site.register(Lesson, LessonAdmin)
 admin_site.register(Tag)
 admin_site.register(Comment)
-admin_site.register(Enrollment)
+admin_site.register(Enrollment, EnrollmentAdmin)

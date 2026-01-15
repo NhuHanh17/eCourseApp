@@ -5,12 +5,22 @@ class CommentOwner(permissions.IsAuthenticated):
     def has_object_permission(self, request, view, comment):
         return super().has_permission(request, view) and request.user == comment.user
 
+
 class IsGiangVienOrReadOnly(permissions.BasePermission):
+    message = "Bạn không có quyền thực hiện thao tác này."
+
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
             return True
-        return bool(request.user and request.user.is_authenticated and
-                    request.user.teacher and request.user.teacher.is_verified)
+
+        user = request.user
+        if not user or not user.is_authenticated:
+            return False
+
+        if not hasattr(user, 'teacher'):
+            return False
+
+        return user.teacher.is_verified
 
 
 class IsVerifiedTeacher(permissions.BasePermission):
@@ -31,22 +41,4 @@ class IsInstructorOfCourse(permissions.BasePermission):
 
         return False
 
-class IsEnrolledStudentOrCourseTeacher(permissions.BasePermission):
-    def has_permission(self, request, view):
-        return True
-
-    def has_object_permission(self, request, view, obj):
-        user = request.user
-        if not user.is_authenticated:
-            return False
-
-        if user.role == User.Role.TEACHER:
-            return hasattr(user, 'teacher') and obj.instructor == user.teacher
-
-        if user.role == User.Role.STUDENT:
-            return Enrollment.objects.filter(
-                student=user.student,
-                course=obj
-            ).exists()
-        return False
 

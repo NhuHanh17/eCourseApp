@@ -10,17 +10,12 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 
-# ==========================================================
-# 1. HỆ THỐNG USER KẾ THỪA (Inheritance)
-# ==========================================================
-
 class User(AbstractUser):
     class Role(models.TextChoices):
         ADMIN = "ADMIN", "Quản trị viên"
         TEACHER = "TEACHER", "Giảng viên"
         STUDENT = "STUDENT", "Sinh viên"
     avatar = CloudinaryField(default='https://res.cloudinary.com/dinusoo6h/image/upload/v1767440746/default-avatar-icon-of-social-media-user-vector_jumkxu.jpg')
-    # avatar = models.ImageField(default='https://res.cloudinary.com/dinusoo6h/image/upload/v1767440746/default-avatar-icon-of-social-media-user-vector_jumkxu.jpg', upload_to='avatar/%Y/%m/')
     role = models.CharField(
         max_length=10,
         choices=Role.choices,
@@ -77,9 +72,6 @@ class AdminProfile(User):
     class Meta:
         verbose_name = "Quản trị viên"
 
-# ==========================================================
-# 2. CÁC MODEL QUẢN LÝ KHÓA HỌC
-# ==========================================================
 
 class BaseModel(models.Model):
     created_date = models.DateTimeField(auto_now_add=True)
@@ -108,7 +100,6 @@ class Course(BaseModel):
     video_url = models.URLField(null=True,blank=True,
                             help_text="Trailer cho khoá học (link youtube hoặc video)")
     image = CloudinaryField(null=True, blank=True, default="https://res.cloudinary.com/dinusoo6h/image/upload/v1767792152/Gemini_Generated_Image_enqxopenqxopenqx_s7tmxb.png")
-    # mage = models.ImageField(upload_to="courses/%Y/%m", null=True, blank=True, default='https://res.cloudinary.com/dinusoo6h/image/upload/v1767792152/Gemini_Generated_Image_enqxopenqxopenqx_s7tmxb.png')
     fee = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     duration = models.IntegerField(default = 0, help_text="Tổng số bài học của khóa học",
                                    validators=[MinValueValidator(0)])
@@ -142,9 +133,6 @@ class Lesson(BaseModel):
         unique_together = ('subject', 'course')
 
 
-# ==========================================================
-# 3. TƯƠNG TÁC KẾ THỪA
-# ==========================================================
 
 class LessonInteraction(BaseModel):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, null=False, blank=False)
@@ -193,9 +181,6 @@ class Rating(CourseInteraction):
         unique_together = ('student', 'course')
 
 
-# ==========================================================
-# 4. ĐĂNG KÝ & THANH TOÁN
-# ==========================================================
 
 class Enrollment(BaseModel):
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='enrollments')

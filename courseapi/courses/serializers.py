@@ -12,16 +12,25 @@ import json
 class ImageSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        data['image'] = instance.image.url
+        
+        if instance.image and hasattr(instance.image, 'url'):
 
+            data['image'] = instance.image.url
+        else:
+            data['image'] = None 
+            
         return data
 
 class AvatarSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
-        data['avatar'] = instance.avatar.url
-        return data
+        if instance.image and hasattr(instance.image, 'url'):
 
+            data['avatar'] = instance.image.url
+        else:
+            data['avatar'] = None 
+            
+        return data
 
 class CategorySerializer(serializers.ModelSerializer):
    class Meta:
@@ -59,7 +68,7 @@ class CourseSerializer(ImageSerializer):
 class CourseCreateSerializer(CourseSerializer):
     tags = serializers.PrimaryKeyRelatedField(many=True, queryset=Tag.objects.all(), required=False)
     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
-    instructor = serializers.PrimaryKeyRelatedField(read_only=True)
+    instructor = serializers.ReadOnlyField(source='instructor.id')
     image = serializers.ImageField(required=False)
 
     class Meta(CourseSerializer.Meta):
@@ -282,3 +291,13 @@ class TransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Transaction
         fields = ['id', 'amount', 'pay_method', 'pay_method_display', 'status', 'student_name', 'created_date']
+
+class LecturerStatsSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    total_students = serializers.IntegerField()
+    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+class MonthlyRevenueSerializer(serializers.Serializer):
+    month = serializers.DateTimeField(format="%Y-%m")
+    monthly_revenue = serializers.DecimalField(max_digits=12, decimal_places=2)
